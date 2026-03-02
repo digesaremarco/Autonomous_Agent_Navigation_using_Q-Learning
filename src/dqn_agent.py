@@ -4,7 +4,7 @@ import torch.optim as optim
 import numpy as np
 import random
 
-import config
+from src import config
 from network import QNetwork
 from replay_buffer import ReplayBuffer
 
