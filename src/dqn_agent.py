@@ -167,13 +167,18 @@ class DQNAgent:
 
             theta_rad = theta * config.DELTA_THETA_RAD
             goal_x, goal_y = config.GOAL_POS
+            sensors = env.get_sensors((x, y, theta))
+
             state = np.array([
                 x / config.NX,
                 y / config.NY,
                 np.sin(theta_rad),
                 np.cos(theta_rad),
                 (goal_x - x) / config.NX,
-                (goal_y - y) / config.NY
+                (goal_y - y) / config.NY,
+                sensors[0],
+                sensors[1],
+                sensors[2]
             ], dtype=np.float32)
 
             total_reward = 0
@@ -193,14 +198,19 @@ class DQNAgent:
                 nx, ny, ntheta = next_raw
 
                 ntheta_rad = ntheta * config.DELTA_THETA_RAD
+                sensors = env.get_sensors((nx, ny, ntheta))
                 next_state = np.array([
-                    nx / config.NX,
-                    ny / config.NY,
+                    x / config.NX,
+                    y / config.NY,
                     np.sin(ntheta_rad),
                     np.cos(ntheta_rad),
-                    (goal_x - nx) / config.NX,
-                    (goal_y - ny) / config.NY
+                    (goal_x - x) / config.NX,
+                    (goal_y - y) / config.NY,
+                    sensors[0],
+                    sensors[1],
+                    sensors[2]
                 ], dtype=np.float32)
+
 
                 self.store(state, action, reward, next_state, done)
                 loss = self.train_step()
@@ -250,13 +260,19 @@ class DQNAgent:
                     for theta in range(config.N_THETA):
                         theta_rad = theta * config.DELTA_THETA_RAD
 
+                        # --- sensors ---
+                        sensors = env.get_sensors((x, y, theta))
+
                         state = np.array([
                             x / config.NX,
                             y / config.NY,
                             np.sin(theta_rad),
                             np.cos(theta_rad),
                             (goal_x - x) / config.NX,
-                            (goal_y - y) / config.NY
+                            (goal_y - y) / config.NY,
+                            sensors[0],  # front
+                            sensors[1],  # left
+                            sensors[2]  # right
                         ], dtype=np.float32)
 
                         state_t = torch.tensor(state).unsqueeze(0).to(self.device)

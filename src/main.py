@@ -95,6 +95,60 @@ def run_policy_tests(planner):
     for action, count in zip(unique, counts):
         print(f"  Action {action}: {count} states")
 
+
+def run_dqn_policy_tests(planner, env):
+    print("\nStarting DQN Policy Tests")
+
+    test_cases = [
+
+        # Collision states
+        ("Collision State (inside obstacle)", (50, 32, 0), lambda a: True),
+
+        # Goal
+        ("Goal State", config.GOAL_STATE, lambda a: True),
+
+        # Safe states
+        ("Safe State (10,10,0)", (10, 10, 0), lambda a: a in config.ACTIONS.values()),
+        ("Safe State (20,80,10)", (20, 80, 10), lambda a: a in config.ACTIONS.values()),
+
+        # Near goal
+        ("Near Goal Forward", (82, 94, config.GOAL_STATE[2]),
+         lambda a: a == config.ACTIONS['MOVE_FORWARD']),
+
+        # Wrong orientation near goal
+        ("Near Goal Wrong Orientation", (82, 94, (config.GOAL_STATE[2]+10) % config.N_THETA),
+         lambda a: a in [
+             config.ACTIONS['TURN_LEFT'],
+             config.ACTIONS['TURN_RIGHT']
+         ]),
+
+        # Facing wall
+        ("Facing Wall", (10, 30, config.GOAL_STATE[2]),
+         lambda a: a != config.ACTIONS['MOVE_FORWARD']),
+    ]
+
+    success_count = 0
+
+    for name, state, test_lambda in test_cases:
+
+        x, y, theta = state
+
+        if not (0 <= x < config.NX and 0 <= y < config.NY):
+            print(f"[ERROR] Test '{name}': State {state} out of bounds")
+            continue
+
+        action = planner.policy[x, y, theta]
+
+        if test_lambda(action):
+            print(f"[SUCCESS] {name} → Action {action}")
+            success_count += 1
+        else:
+            print(f"[FAILED] {name} → Action {action}")
+
+    print("\nDQN Policy Tests Completed")
+    print(f"Result: {success_count}/{len(test_cases)} passed")
+
+
 if __name__ == "__main__":
 
     env = Environment()
@@ -135,7 +189,7 @@ if __name__ == "__main__":
 
         print("Using Deep Q-Network")
 
-        state_dim = 6  # per prova
+        state_dim = 9
         action_dim = len(config.ACTIONS)
         planner = DQNAgent(
             state_dim=state_dim,
@@ -143,15 +197,30 @@ if __name__ == "__main__":
             device="cuda" if torch.cuda.is_available() else "cpu"
         )
 
-        planner.train(env, num_episodes=3000)
+        planner.train(env, num_episodes=2100)
         planner.policy = planner.extract_policy(env)
+        # save the policy for later use
+        np.save('dqn_policy.npy', planner.policy)
 
     else:
         raise ValueError(f"Unknown METHOD in config: {config.METHOD}")
 
 
-    # Policy Tests
-    run_policy_tests(planner)
+    if method in ["vi", "q_learning"]:
+        run_policy_tests(planner) # Policy Tests
+
+    elif method == "dqn":
+        # load the policy if not already in memory (e.g. after training or from a previous run)
+        if not hasattr(planner, 'policy'):
+            try:
+                planner.policy = np.load('dqn_policy.npy')
+                print("DQN policy loaded from file.")
+            except FileNotFoundError:
+                print("DQN policy file not found. Please run training first to generate 'dqn_policy.npy'.")
+                planner.policy = None
+
+        run_dqn_policy_tests(planner, env)
+
 
     print("\n RUNNING SIMULATIONS AND VISUALIZATION")
 
@@ -164,10 +233,10 @@ if __name__ == "__main__":
     for start_state in start_states:
         # Simulate discrete path
         path = simulate_policy(planner, env, start_state, continuous_mode=False)
-        #plot_static_path(env, path, title=f"Discrete Path from {start_state}")
+        plot_static_path(env, path, title=f"Discrete Path from {start_state}")
         #animate_path(env, path, title=f"Discrete Animation from {start_state}")
 
         # Simulate continuous path
         cont_path = simulate_policy(planner, env, start_state, continuous_mode=True)
-        #plot_static_path(env, cont_path, title=f"Continuous Path from {start_state}")
+        plot_static_path(env, cont_path, title=f"Continuous Path from {start_state}")
         #animate_path(env, cont_path, title=f"Continuous Animation from {start_state}")

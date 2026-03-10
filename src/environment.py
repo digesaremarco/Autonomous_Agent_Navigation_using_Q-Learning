@@ -55,6 +55,34 @@ class Environment:
 
         return (check_x == gx) and (check_y == gy) and (theta == gtheta)
 
+    def get_sensors(self, state):
+
+        x, y, theta_idx = state
+        theta = theta_idx * self.config.DELTA_THETA_RAD
+
+        directions = [
+            theta,  # front
+            theta + np.pi / 2,  # left
+            theta - np.pi / 2  # right
+        ]
+
+        distances = []
+
+        for d in directions:
+
+            for r in np.linspace(0, self.config.SENSOR_RANGE, 20):
+
+                sx = x + r * np.cos(d)
+                sy = y + r * np.sin(d)
+
+                if self.is_collision((sx, sy, theta_idx)):
+                    distances.append(r / self.config.SENSOR_RANGE)
+                    break
+            else:
+                distances.append(1.0)
+
+        return np.array(distances, dtype=np.float32)
+
     def step(self, state, action, continuous=False):
         if self.is_goal(state):
             return state, 0.0, True
